@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Guard Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      background: #f7f7f8;
+      color: #222;
+    }
+    .header {
+      margin-bottom: 20px;
+    }
+    .stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .card, .stat, .table-wrap {
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .stat {
+      min-width: 140px;
+    }
+    .section-title {
+      margin: 0 0 12px 0;
+      font-size: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      vertical-align: top;
+    }
+    .status-completed {
+      color: green;
+      font-weight: bold;
+    }
+    .status-incomplete {
+      color: #d97706;
+      font-weight: bold;
+    }
+    .latest-item {
+      margin: 6px 0;
+    }
+    .submit-box {
+      margin-top: 20px;
+    }
+    input[type="text"], select {
+      width: 70%;
+      padding: 10px;
+      font-size: 14px;
+    }
+    button {
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-right: 6px;
+    }
+    .query-answer {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      white-space: pre-wrap;
+    }
+    .hint {
+      color: #666;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .edit-form {
+      display: none;
+      margin-top: 10px;
+      padding: 12px;
+      background: #f9fafb;
+      border: 1px solid #eee;
+      border-radius: 8px;
+    }
+    .edit-form input, .edit-form select {
+      width: 100%;
+      margin-bottom: 8px;
+      box-sizing: border-box;
+    }
+    .small-btn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Guard Dashboard / 门卫工作台</h1>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div>今日来访</div>
+      <strong>{{ stats.today_total }}</strong>
+    </div>
+    <div class="stat">
+      <div>已完成</div>
+      <strong>{{ stats.completed_count }}</strong>
+    </div>
+    <div class="stat">
+      <div>待补充</div>
+      <strong>{{ stats.incomplete_count }}</strong>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2 class="section-title">最新来访</h2>
+      {% if latest %}
+        <div class="latest-item">车牌号：{{ latest.plate_number or '未知' }}</div>
+        <div class="latest-item">来找谁：{{ latest.target or '未知' }}</div>
+        <div class="latest-item">来做什么：{{ latest.reason or '未知' }}</div>
+        <div class="latest-item">手机号：{{ latest.phone or '未知' }}</div>
+        <div class="latest-item">入场时间：{{ latest.entry_time or '未知' }}</div>
+        <div class="latest-item">
+          状态：
+          {% if latest.status == 'completed' %}
+            <span class="status-completed">已完成</span>
+          {% else %}
+            <span class="status-incomplete">待补充</span>
+          {% endif %}
+        </div>
+      {% else %}
+        <div>暂无记录</div>
+      {% endif %}
+    </div>
+
+    <div class="table-wrap">
+      <h2 class="section-title">最近记录（可编辑）</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>时间</th>
+            <th>车牌号</th>
+            <th>来找谁</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.entry_time or '未知' }}</td>
+            <td>{{ r.plate_number or '未知' }}</td>
+            <td>{{ r.target or '未知' }}</td>
+            <td>
+              {% if r.status == 'completed' %}
+                <span class="status-completed">已完成</span>
+              {% else %}
+                <span class="status-incomplete">待补充</span>
+              {% endif %}
+            </td>
+            <td>
+              <button class="small-btn" onclick="toggleEdit('{{ r.id }}')">编辑</button>
+
+              <div id="edit-form-{{ r.id }}" class="edit-form">
+                <input type="text" id="plate-{{ r.id }}" value="{{ r.plate_number or '' }}" placeholder="车牌号" />
+                <input type="text" id="target-{{ r.id }}" value="{{ r.target or '' }}" placeholder="来找谁" />
+                <input type="text" id="reason-{{ r.id }}" value="{{ r.reason or '' }}" placeholder="来做什么" />
+                <input type="text" id="phone-{{ r.id }}" value="{{ r.phone or '' }}" placeholder="手机号" />
+                <select id="status-{{ r.id }}">
+                  <option value="completed" {% if r.status == 'completed' %}selected{% endif %}>已完成</option>
+                  <option value="incomplete" {% if r.status != 'completed' %}selected{% endif %}>待补充</option>
+                </select>
+                <button class="small-btn" onclick="saveEdit('{{ r.id }}')">保存</button>
+                <button class="small-btn" onclick="toggleEdit('{{ r.id }}')">取消</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card submit-box">
+      <h2 class="section-title">测试文本输入</h2>
+      <form id="submitForm">
+        <input
+          type="text"
+          id="textInput"
+          placeholder="例如：沪A12345，来找张经理送货，手机号13800000000"
+        />
+        <button type="submit">提交</button>
+      </form>
+      <p id="result"></p>
+    </div>
+
+    <div class="card submit-box">
+      <h2 class="section-title">门卫查询 Agent</h2>
+      <form id="queryForm">
+        <input
+          type="text"
+          id="queryInput"
+          placeholder="例如：今天来了多少车 / 本周一共多少访问车辆 / 张云霄这个月被来访了几次 / 什么时间段访问最多"
+        />
+        <button type="submit">查询</button>
+      </form>
+      <div class="hint">
+        当前更适合查询统计信息和“被访对象”维度的问题，不适合查询访客本人姓名，因为系统没有单独采集司机姓名。
+      </div>
+      <div id="queryAnswer" class="query-answer">请输入问题开始查询。</div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("submitForm");
+    const input = document.getElementById("textInput");
+    const result = document.getElementById("result");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      const resp = await fetch("/submit_text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await resp.json();
+      result.textContent = `提交成功，record_id=${data.record_id}, status=${data.status}`;
+      input.value = "";
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    });
+
+    const queryForm = document.getElementById("queryForm");
+    const queryInput = document.getElementById("queryInput");
+    const queryAnswer = document.getElementById("queryAnswer");
+
+    queryForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = queryInput.value.trim();
+      if (!text) return;
+
+      queryAnswer.textContent = "查询中...";
+
+      const resp = await fetch("/guard_query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await resp.json();
+      queryAnswer.textContent = data.answer || "未获取到结果。";
+    });
+
+    function toggleEdit(id) {
+      const form = document.getElementById(`edit-form-${id}`);
+      if (form.style.display === "block") {
+        form.style.display = "none";
+      } else {
+        form.style.display = "block";
+      }
+    }
+
+    async function saveEdit(id) {
+      const payload = {
+        id: Number(id),
+        plate_number: document.getElementById(`plate-${id}`).value.trim(),
+        target: document.getElementById(`target-${id}`).value.trim(),
+        reason: document.getElementById(`reason-${id}`).value.trim(),
+        phone: document.getElementById(`phone-${id}`).value.trim(),
+        status: document.getElementById(`status-${id}`).value
+      };
+
+      const resp = await fetch("/records/update_json", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        alert(data.detail || "保存失败");
+        return;
+      }
+
+      alert(`保存成功，record_id=${data.record_id}, status=${data.status}`);
+      window.location.reload();
+    }
+  </script>
+</body>
+</html>
